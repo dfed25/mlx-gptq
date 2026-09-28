@@ -1,0 +1,5 @@
+mlx>=0.32
+mlx-lm>=0.31
+numpy
+pyarrow
+huggingface_hub
