@@ -4,7 +4,7 @@ GPTQ (error-feedback) quantization for MLX language models on Apple Silicon, pac
 format so the result loads and runs with `mlx_lm` at the same speed as the models you download today.
 
 The 4-bit models on `mlx-community` are made by round-to-nearest. On the two models measured so far, GPTQ with an
-error-minimising grid removes about 70% of their quality loss at identical size and decode speed.
+error-minimising grid removes about 70% of their quality loss, at the same size and speed within 5%.
 
 | model | fp16 | 4-bit round to nearest (what `mlx_lm convert -q` and mlx-community ship) | **mlx-gptq 4-bit** |
 |---|---|---|---|
