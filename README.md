@@ -10,8 +10,9 @@ Note: mlx-lm itself ships calibration-based quantizers as separate commands (`ml
 `mlx_lm.dynamic_quant`). Its GPTQ supports 2/4/8 bits, computes all Hessians once from the unquantized model and takes
 each group's grid from the original weights. This repository differs in three details from the GPTQ paper's recipe:
 layers are calibrated sequentially on already-quantized predecessors, each group's grid is chosen from the
-error-updated weights, and the grid range is searched for least error (`--mse`); it also supports 3 bits. A measured
-comparison against `mlx_lm.gptq`, `awq` and `dwq` on the same models is in progress and will be added to RESULTS.md.
+error-updated weights, and the grid range is searched for least error (`--mse`); it also supports 3 bits. On Qwen2.5-1.5B,
+same evaluation, all packed: `mlx_lm.gptq` 10.75, `mlx_lm.awq` 10.50, round to nearest 10.67, this repository 9.66 (details
+and sizes in RESULTS.md; `dwq` not yet measured).
 
 | model | fp16 | 4-bit round to nearest (what `mlx_lm convert -q` and mlx-community ship) | **mlx-gptq 4-bit** |
 |---|---|---|---|

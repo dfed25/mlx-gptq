@@ -21,6 +21,19 @@ Decode speed (alternating A/B, medians of 5): community 4-bit 138.5 tok/s, GPTQ 
 137.8, GPTQ 3-bit + 8-bit embedding 125.8. The packed 4-bit model with the error-minimising grid and an 8-bit
 embedding has not been measured yet on Qwen.
 
+## Qwen2.5-1.5B-Instruct: mlx-lm's own quantizers, same evaluation, all packed models
+
+| method | bits/weight | perplexity | size | decode tok/s (same session) |
+|---|---|---|---|---|
+| mlx-community 4-bit (round to nearest, 4-bit embedding) | 4.5 | 10.669 | | 195.4 |
+| `mlx_lm.gptq` 4-bit, group 64 (6-bit embedding fallback) | 4.80 | 10.754 | 903 MB | 188.1 |
+| `mlx_lm.awq` 4-bit, group 64 (4-bit embedding, group 32) | | 10.498 | 853 MB | |
+| **mlx-gptq 4-bit, error-minimising grid, 8-bit embedding** | | **9.658** | 951 MB | 179.8 |
+
+Same 128 x 512 calibration budget for all three calibrated methods (mlx-lm's use their own calibration text). The
+speed differences track the embedding width (4, 6, 8 bits); with a 4-bit embedding our model matched the community
+model's speed in an earlier measurement. A layer-by-layer ablation of the three recipe differences is the next step.
+
 ## SmolLM2-1.7B-Instruct
 
 | method | bits/weight | perplexity |
