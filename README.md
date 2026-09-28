@@ -25,6 +25,15 @@ The SmolLM2 row is the packed model exactly as `quantize.sh` produces it (8-bit 
 embedding is why it is 5% larger and 5% slower than the round-to-nearest model; with a 4-bit embedding
 (`EMBED_BITS=4`) size and speed match the community model and the perplexity rises by about 0.5.
 
+## Ready-made models
+
+- [dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-mlx](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-mlx) (perplexity 9.66, 951 MB)
+- [dfed24/SmolLM2-1.7B-Instruct-gptq-4bit-mlx](https://huggingface.co/dfed24/SmolLM2-1.7B-Instruct-gptq-4bit-mlx) (perplexity 9.41, 970 MB)
+
+```bash
+python -m mlx_lm generate --model dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-mlx --prompt "Hello"
+```
+
 ## Install
 
 ```bash
