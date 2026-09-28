@@ -60,7 +60,7 @@ The steps, if you want them separately:
 | script | what it does |
 |---|---|
 | `get_wikitext.py` | downloads WikiText-2 raw (train for calibration, test for evaluation) |
-| `gptq_mlx.py MODEL OUT BITS [--group 64] [--mse] [--nsamples 128] [--seqlen 512] [--damp 0.01] [--block 128]` | GPTQ on every linear layer; writes the dequantized weights plus the exact codes (`gptq_codes.npz`) |
+| `gptq_mlx.py MODEL OUT BITS [--group 64] [--mse] [--lloyd] [--nsamples 128] [--seqlen 512] [--damp 0.01] [--block 128]` | GPTQ on every linear layer; writes the dequantized weights plus the exact codes (`gptq_codes.npz`) |
 | `ppl_wikitext.py MODEL [NWIN]` | WikiText-2 perplexity of any MLX model |
 | `build_quantized.py DEQ OUT BITS [--group 64] [--embed-bits 8]` | packs the exact codes into `QuantizedLinear` layers; the tied embedding is quantized separately (8-bit by default) |
 | `cast_fp16.py SRC OUT` | casts bfloat16 parameters to float16 (30% faster decoding) |

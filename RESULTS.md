@@ -8,6 +8,7 @@ WikiText-2 test perplexity, 20 windows of 2048 tokens. Bits per weight include t
 |---|---|---|
 | fp16 | 16 | 9.379 |
 | mlx-community 4-bit (round to nearest) | 4.5 | 10.669 |
+| **GPTQ 4-bit, alternating grid fit (`--mse --lloyd`), packed, 8-bit embedding** | 4.5 | **9.596** (dequantized 9.594) |
 | GPTQ 4-bit, error-minimising grid (dequantized weights, fp16 embedding) | 4.5 | 9.653 |
 | GPTQ 4-bit, min-max grid (dequantized weights, fp16 embedding) | 4.5 | 9.704 |
 | GPTQ 4-bit, min-max grid, packed with a 4-bit embedding | 4.5 | 10.163 |
@@ -47,6 +48,15 @@ model's speed in an earlier measurement. A layer-by-layer ablation of the three 
 
 Decode speed (alternating A/B, medians of 5, same session): round to nearest 4-bit 119.3 tok/s (922 MB), GPTQ 4-bit
 with 8-bit embedding 113.7 tok/s (970 MB).
+
+## The alternating grid fit (`--lloyd`)
+
+For each group of 64 weights the 16-level grid is described by an offset and a step. Given an assignment of weights to
+levels, the least-squares offset and step are an ordinary line fit of weight against level index; given the grid, the
+best assignment is nearest-level. Alternating the two never increases the group's squared error and stops after finitely
+many rounds, but can stop in a non-optimal valley (example: 0, 1, 6, 6, 9, 12 with 3 levels), so it is started from four
+shrunk min-max grids and the result is kept per group only where it beats the range-search grid. On 60,000 real groups it
+lowers the squared rounding error by about 8% over the range search; on the whole model 9.653 → 9.594.
 
 ## Settings
 

@@ -4,7 +4,7 @@
 set -e
 SRC=$1; OUT=$2; BITS=$3; G=${4:-64}
 [ -f wikitext2_train.txt ] || python get_wikitext.py
-python gptq_mlx.py "$SRC" "$OUT-deq" "$BITS" --group "$G" --mse
+python gptq_mlx.py "$SRC" "$OUT-deq" "$BITS" --group "$G" --mse --lloyd
 python ppl_wikitext.py "$OUT-deq" 20
 python build_quantized.py "$OUT-deq" "$OUT-bf16" "$BITS" --group "$G" --embed-bits "${EMBED_BITS:-8}"
 python cast_fp16.py "$OUT-bf16" "$OUT"

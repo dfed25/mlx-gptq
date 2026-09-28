@@ -17,6 +17,9 @@ ap = argparse.ArgumentParser(); ap.add_argument("model"); ap.add_argument("out")
 ap.add_argument("--group", type=int, default=64); ap.add_argument("--nsamples", type=int, default=128)
 ap.add_argument("--seqlen", type=int, default=512); ap.add_argument("--damp", type=float, default=0.01)
 ap.add_argument("--block", type=int, default=128); ap.add_argument("--seed", type=int, default=0)
+ap.add_argument("--no-sequential", action="store_true", help="ablation: calibrate every layer on the UNQUANTIZED model's activations (as mlx_lm.quant.gptq does)")
+ap.add_argument("--grid-from-original", action="store_true", help="ablation: take each group's grid from the original weights instead of the error-updated ones (as mlx_lm.quant.gptq does)")
+ap.add_argument("--lloyd", action="store_true", help="per-group grid by alternating nearest-tick assignment and least-squares line fit (Dom's loop), 4 starts, kept only where it beats the --mse/min-max grid")
 ap.add_argument("--mse", action="store_true", help="per-group grid by error search (shrink the min-max range) instead of plain min-max")
 args = ap.parse_args()
 QMAX = 2 ** args.bits - 1
@@ -29,7 +32,7 @@ def quant_group(w, lo, hi):
 
 def gptq(W, H):
     """W: (rows, cols) float32 numpy (a Linear's weight, x @ W.T). H: (cols, cols). Returns dequantized W'."""
-    W = W.astype(np.float64).copy(); cols = W.shape[1]; H = H.astype(np.float64).copy()
+    W = W.astype(np.float64).copy(); W0 = W.copy(); cols = W.shape[1]; H = H.astype(np.float64).copy()
     dead = np.diag(H) == 0; H[dead, dead] = 1; W[:, dead] = 0
     H[np.diag_indices(cols)] += args.damp * np.mean(np.diag(H))
     Hinv = np.linalg.inv(H); U = np.linalg.cholesky(Hinv).T          # upper triangular: Hinv = U^T U
@@ -39,7 +42,8 @@ def gptq(W, H):
         for i in range(i2 - i1):
             j = i1 + i
             if j % g == 0:                                  # grid for this group from the CURRENT (error-updated) weights
-                grp = np.concatenate([Wb[:, i:min(i + g, i2 - i1)] if True else None] + ([W[:, i2:j + g]] if j + g > i2 else []), axis=1)
+                grp = np.concatenate([Wb[:, i:min(i + g, i2 - i1)]] + ([W[:, i2:j + g]] if j + g > i2 else []), axis=1)
+                if args.grid_from_original: grp = W0[:, j:j + g]
                 lo, hi = grp.min(axis=1), grp.max(axis=1)
                 if args.mse:                                # shrink the range: try p in [0.6, 1], keep the p with least squared error per row
                     best_err = None
@@ -50,6 +54,21 @@ def gptq(W, H):
                         else:
                             better = e < best_err; best_err = np.where(better, e, best_err); blo = np.where(better, lo2, blo); bhi = np.where(better, hi2, bhi)
                     lo, hi = blo, bhi
+                if args.lloyd:                              # alternating assign / line-fit, multi-start; keep per row only if better
+                    e_cur = ((quant_group(grp, lo, hi) - grp) ** 2).sum(axis=1)
+                    lo0, hi0 = grp.min(axis=1), grp.max(axis=1)
+                    for pfrac in (1.0, 0.9, 0.8, 0.7):
+                        l, st = lo0 * pfrac, np.maximum((hi0 - lo0) * pfrac / QMAX, 1e-8)
+                        for _ in range(30):
+                            k = np.clip(np.round((grp - l[:, None]) / st[:, None]), 0, QMAX)
+                            kb = k.mean(axis=1, keepdims=True); xb = grp.mean(axis=1, keepdims=True); sxx = ((k - kb) ** 2).sum(axis=1)
+                            ok = sxx > 0
+                            a = np.where(ok, ((k - kb) * (grp - xb)).sum(axis=1) / np.where(ok, sxx, 1.0), st); a = np.maximum(a, 1e-8)
+                            b = xb[:, 0] - a * kb[:, 0]
+                            if np.allclose(a, st) and np.allclose(b, l): break
+                            st, l = a, b
+                        h = l + QMAX * st; e_new = ((quant_group(grp, l, h) - grp) ** 2).sum(axis=1)
+                        better = e_new < e_cur; e_cur = np.where(better, e_new, e_cur); lo = np.where(better, l, lo); hi = np.where(better, h, hi)
                 SC[:, j // g] = np.maximum((hi - lo) / QMAX, 1e-8); BI[:, j // g] = lo
             w = Wb[:, i]; d = Ub[i, i]
             q = quant_group(w[:, None], lo, hi)[:, 0]; Q[:, j] = q; codes[:, j] = np.clip(np.round((q - lo) / np.maximum((hi - lo) / QMAX, 1e-8)), 0, QMAX)
@@ -89,11 +108,15 @@ for li, layer in enumerate(inner.layers):
     caps = {n: Capture(get(layer, n)) for n in NAMES}
     for n, c in caps.items(): setm(layer, n, c)
     for b in range(0, args.nsamples, BS): mx.eval(layer(h[b:b + BS], mask, None))   # accumulate H on fp inputs of this layer
+    if args.no_sequential:                                         # next layer's inputs from the UNQUANTIZED layer
+        outs = [layer(h[b:b + BS], mask, None) for b in range(0, args.nsamples, BS)]; h_next = mx.concatenate(outs); mx.eval(h_next)
     for n, c in caps.items():
         lin = c.lin; W = np.array(lin.weight.astype(mx.float32)); Hn = np.array(c.H) / c.n
         Wq, codes, SC, BI = gptq(W, Hn); lin.weight = mx.array(Wq).astype(mx.bfloat16); setm(layer, n, lin)
         CODES[f"model.layers.{li}.{n}"] = (codes.astype(np.uint8), SC, BI)
-    outs = [layer(h[b:b + BS], mask, None) for b in range(0, args.nsamples, BS)]; h = mx.concatenate(outs); mx.eval(h)
+    if args.no_sequential: h = h_next
+    else:
+        outs = [layer(h[b:b + BS], mask, None) for b in range(0, args.nsamples, BS)]; h = mx.concatenate(outs); mx.eval(h)
     mx.clear_cache(); print(f"layer {li:2d} done  ({time.time() - t0:.0f}s)", flush=True)
 
 from mlx_lm.utils import save_model, save_config
