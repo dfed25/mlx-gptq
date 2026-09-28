@@ -3,8 +3,15 @@
 GPTQ (error-feedback) quantization for MLX language models on Apple Silicon, packed into MLX's own quantized
 format so the result loads and runs with `mlx_lm` at the same speed as the models you download today.
 
-The 4-bit models on `mlx-community` are made by round-to-nearest. On the two models measured so far, GPTQ with an
-error-minimising grid removes about 70% of their quality loss, at the same size and speed within 5%.
+The 4-bit models on `mlx-community` are made by round-to-nearest (`mlx_lm convert -q`). On the two models measured so
+far, GPTQ with an error-minimising grid removes about 70% of their quality loss, at the same size and speed within 5%.
+
+Note: mlx-lm itself ships calibration-based quantizers as separate commands (`mlx_lm.gptq`, `mlx_lm.awq`, `mlx_lm.dwq`,
+`mlx_lm.dynamic_quant`). Its GPTQ supports 2/4/8 bits, computes all Hessians once from the unquantized model and takes
+each group's grid from the original weights. This repository differs in three details from the GPTQ paper's recipe:
+layers are calibrated sequentially on already-quantized predecessors, each group's grid is chosen from the
+error-updated weights, and the grid range is searched for least error (`--mse`); it also supports 3 bits. A measured
+comparison against `mlx_lm.gptq`, `awq` and `dwq` on the same models is in progress and will be added to RESULTS.md.
 
 | model | fp16 | 4-bit round to nearest (what `mlx_lm convert -q` and mlx-community ship) | **mlx-gptq 4-bit** |
 |---|---|---|---|
