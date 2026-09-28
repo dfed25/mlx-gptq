@@ -1,2 +1,37 @@
 [transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (2568237 > 8192). Running this sequence through the model will result in indexing errors
 layer  0 done  (65s)
+layer  1 done  (120s)
+layer  2 done  (173s)
+layer  3 done  (225s)
+layer  4 done  (275s)
+layer  5 done  (328s)
+layer  6 done  (378s)
+layer  7 done  (431s)
+layer  8 done  (483s)
+layer  9 done  (535s)
+layer 10 done  (586s)
+layer 11 done  (637s)
+layer 12 done  (688s)
+layer 13 done  (789s)
+layer 14 done  (817s)
+layer 15 done  (845s)
+layer 16 done  (873s)
+layer 17 done  (901s)
+layer 18 done  (929s)
+layer 19 done  (956s)
+layer 20 done  (984s)
+layer 21 done  (1012s)
+layer 22 done  (1040s)
+layer 23 done  (1068s)
+saved dequantized 4-bit GPTQ model to models/smol1.7b-gptq4-deq  (1156s)
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (304986 > 8192). Running this sequence through the model will result in indexing errors
+models/smol1.7b-gptq4-deq: wikitext-2 perplexity 9.409 over 40940 tokens (20 windows of 2048)
+exact codes from gptq_codes.npz: True
+embedding quantized to 4 bits
+converted 168 linear layers; max reconstruction error 0.00e+00; groups needing full-range fallback 0
+saved models/smol1.7b-gptq4-bf16
+saved models/smol1.7b-gptq4
+[transformers] Token indices sequence length is longer than the specified maximum sequence length for this model (304986 > 8192). Running this sequence through the model will result in indexing errors
+models/smol1.7b-gptq4: wikitext-2 perplexity 9.923 over 40940 tokens (20 windows of 2048)
+done: models/smol1.7b-gptq4 (the dequantized copy models/smol1.7b-gptq4-deq can be deleted)
+E2E_EXIT=0

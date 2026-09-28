@@ -9,6 +9,7 @@ from mlx_lm.utils import save_model
 from pack_affine import pack
 
 ap = argparse.ArgumentParser(); ap.add_argument("src"); ap.add_argument("out"); ap.add_argument("bits", type=int); ap.add_argument("--group", type=int, default=64)
+ap.add_argument("--embed-bits", type=int, default=8, help="bits for the (tied) embedding / output projection; 8 costs nothing in quality, 4 costs ~0.5 perplexity")
 a = ap.parse_args(); QMAX = 2 ** a.bits - 1; g = a.group
 
 def to_codes(W):
@@ -50,15 +51,17 @@ for li, layer in enumerate(model.model.layers):
         ql.weight = mx.array(pack(q, a.bits)); ql.scales = mx.array(s).astype(mx.float16); ql.biases = mx.array(b).astype(mx.float16)
         if "bias" in lin: ql.bias = lin.bias
         setattr(parent, parts[-1], ql); n_lin += 1
-# the embedding (tied to the output projection) is read every token: quantize it too, 4-bit like the community models
-emb = model.model.embed_tokens
+# the embedding (tied to the output projection) is read every token: quantize it too (8-bit by default: free in quality)
+emb = model.model.embed_tokens; EB = a.embed_bits
 if isinstance(emb, nn.Embedding):
-    qe = nn.QuantizedEmbedding.from_embedding(emb, group_size=g, bits=max(a.bits, 4)); model.model.embed_tokens = qe
-    print(f"embedding quantized to {max(a.bits, 4)} bits")
+    qe = nn.QuantizedEmbedding.from_embedding(emb, group_size=g, bits=EB); model.model.embed_tokens = qe
+    print(f"embedding quantized to {EB} bits")
 print(f"converted {n_lin} linear layers; max reconstruction error {worst:.2e}; groups needing full-range fallback {nbad}")
 out = pathlib.Path(a.out); out.mkdir(parents=True, exist_ok=True)
 save_model(out, model)
-cfg = json.load(open(pathlib.Path(a.src) / "config.json")); cfg["quantization"] = {"group_size": g, "bits": a.bits}; cfg["quantization_config"] = cfg["quantization"]
+cfg = json.load(open(pathlib.Path(a.src) / "config.json")); cfg["quantization"] = {"group_size": g, "bits": a.bits}
+if EB != a.bits: cfg["quantization"]["model.embed_tokens"] = {"group_size": g, "bits": EB}
+cfg["quantization_config"] = cfg["quantization"]
 json.dump(cfg, open(out / "config.json", "w"), indent=2)
 for f in pathlib.Path(a.src).glob("*"):
     if f.suffix not in (".safetensors", ".npz") and f.is_file() and f.name != "config.json" and not (out / f.name).exists(): shutil.copy(f, out / f.name)
