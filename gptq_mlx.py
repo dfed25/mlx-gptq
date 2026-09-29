@@ -59,7 +59,7 @@ def gptq(W, H):
                     lo0, hi0 = grp.min(axis=1), grp.max(axis=1)
                     for pfrac in (1.0, 0.9, 0.8, 0.7):
                         l, st = lo0 * pfrac, np.maximum((hi0 - lo0) * pfrac / QMAX, 1e-8)
-                        for _ in range(30):
+                        for _ in range(12):                 # 12 rounds capture >99.9% of the gain (grid_lloyd_iters.py)
                             k = np.clip(np.round((grp - l[:, None]) / st[:, None]), 0, QMAX)
                             kb = k.mean(axis=1, keepdims=True); xb = grp.mean(axis=1, keepdims=True); sxx = ((k - kb) ** 2).sum(axis=1)
                             ok = sxx > 0
