@@ -31,9 +31,23 @@ embedding has not been measured yet on Qwen.
 | `mlx_lm.awq` 4-bit, group 64 (4-bit embedding, group 32) | | 10.498 | 853 MB | |
 | **mlx-gptq 4-bit, error-minimising grid, 8-bit embedding** | | **9.658** | 951 MB | 179.8 |
 
-Same 128 x 512 calibration budget for all three calibrated methods (mlx-lm's use their own calibration text). The
-speed differences track the embedding width (4, 6, 8 bits); with a 4-bit embedding our model matched the community
-model's speed in an earlier measurement. A layer-by-layer ablation of the three recipe differences is the next step.
+Same 128 x 512 calibration budget for all calibrated methods. The speed differences track the embedding width (4, 6, 8
+bits); with a 4-bit embedding our model matched the community model's speed in an earlier measurement.
+
+**Calibration text matters, and we calibrate in-domain.** Our default calibrates on WikiText-2 train and evaluates on
+WikiText-2 test. Swapping calibration texts (same everything else):
+
+| method | calibration text | perplexity |
+|---|---|---|
+| this repository (`--mse`, fp16 embedding) | WikiText-2 train | 9.653 |
+| this repository (`--mse`, fp16 embedding) | mlx-lm's generic calibration_v5.txt | 9.945 |
+| `mlx_lm.gptq`, current main (index bug fixed), 6-bit embedding | calibration_v5.txt | 10.408 |
+| `mlx_lm.gptq`, current main, 6-bit embedding | WikiText-2 train | 10.283 |
+| `mlx_lm.gptq`, current main, 4-bit embedding | calibration_v5.txt | 10.878 |
+
+So about 0.3 of our lead on this benchmark is in-domain calibration; about 0.45 remains on identical text. An ablation of
+the recipe differences (sequential calibration, grid timing) accounts for at most 0.07 of it; the rest is being traced in
+the implementation.
 
 ## SmolLM2-1.7B-Instruct
 

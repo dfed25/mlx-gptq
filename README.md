@@ -12,8 +12,8 @@ repository differs in two details: layers are calibrated sequentially on already
 GPTQ paper), and the grid range is searched for least error (`--mse`); it also supports 3 bits. The released mlx-lm
 0.31.3 additionally carries an indexing bug in the error propagation that was fixed on the main branch on 2026-09-14
 (ml-explore/mlx-lm#1880); the comparison below used the release, and a rerun against main is in progress. On Qwen2.5-1.5B,
-same evaluation, all packed: `mlx_lm.gptq` 10.75, `mlx_lm.awq` 10.50, round to nearest 10.67, this repository 9.66 (details
-and sizes in RESULTS.md; `dwq` not yet measured).
+same evaluation: `mlx_lm.gptq` (current main) 10.41, `mlx_lm.awq` 10.50, round to nearest 10.67, this repository 9.66
+with in-domain (WikiText train) calibration and 9.95 with mlx-lm's generic calibration text (details in RESULTS.md).
 
 | model | fp16 | 4-bit round to nearest (what `mlx_lm convert -q` and mlx-community ship) | **mlx-gptq 4-bit** |
 |---|---|---|---|
