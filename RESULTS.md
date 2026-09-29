@@ -46,8 +46,15 @@ WikiText-2 test. Swapping calibration texts (same everything else):
 | `mlx_lm.gptq`, current main, 4-bit embedding | calibration_v5.txt | 10.878 |
 
 So about 0.3 of our lead on this benchmark is in-domain calibration; about 0.45 remains on identical text. An ablation of
-the recipe differences (sequential calibration, grid timing) accounts for at most 0.07 of it; the rest is being traced in
-the implementation.
+the recipe differences (sequential calibration, grid timing) accounts for at most 0.07 of it.
+
+**Noise floors.** This pipeline, three calibration seeds (Qwen, `--mse`): 9.653 / 9.644 / 9.635, spread 0.02, so the
+grid-search gain (0.05) and the grid-fit gain (0.06) are real. `mlx_lm.gptq` (current main) is deterministic for a fixed
+seed but far less stable: seed 123 gives 10.408 and seed 7 gives 10.152 on its default calibration text; accumulating its
+Hessian in float32 instead of the activation dtype moves the result to 9.897 with WikiText calibration and to 10.866 with
+its default text; computing its inverse-Hessian chain in float64 changes nothing further. Its default calibration file is
+small (about 100k tokens), so 128 x 512 samples cover most of it. The cause of the instability is not identified; the
+dtype of the Hessian and of its inverse are ruled out.
 
 ## SmolLM2-1.7B-Instruct
 
