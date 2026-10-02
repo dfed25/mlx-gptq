@@ -22,6 +22,35 @@ Decode speed (alternating A/B, medians of 5): community 4-bit 138.5 tok/s, GPTQ 
 137.8, GPTQ 3-bit + 8-bit embedding 125.8. The packed 4-bit model with the error-minimising grid and an 8-bit
 embedding has not been measured yet on Qwen.
 
+## Qwen2.5-1.5B-Instruct at 3 and 2 bits: the grid fit, refinement and weighted refit (2026-10-02)
+
+All runs: group 64, same calibration (128 x 512 tokens of WikiText-2 train), evaluated in process with `--eval`;
+the three-seed spread of this pipeline is 0.02. Shipped numbers in earlier rows of this file used `--mse` alone.
+
+| 3-bit recipe | perplexity |
+|---|---|
+| `--mse` (range-search grid, the earlier default) | 10.899 |
+| `--mse --lloyd` (alternating grid fit) | 10.654 |
+| `--mse --lloyd --refine 3` (coordinate-descent refinement of the codes on the layer objective) | 10.552 |
+| `--mse --lloyd --refine 3 --refit 2` (plus least-squares refit of every group's grid in the layer metric) | **10.379** |
+| `--mse --lloyd --template --refine 3` (learned non-uniform ticks; not packable in MLX's affine format) | 10.374 |
+| `--mse --lloyd --refine 2 --refine-z 1.0 --pieces 4` (flips accepted only above 1 standard error) | 10.534 |
+
+| 2-bit recipe | perplexity |
+|---|---|
+| `--mse` alone, earlier measurement with the min-max grid | 689 |
+| `--mse --lloyd` | 21.94 |
+| `--mse --lloyd --refine 3` | 19.63 |
+
+At 4 bits the refinement adds nothing (`--mse --lloyd` 9.594, with `--refine 3` 9.605). Reference: fp16 9.379.
+
+The refinement is coordinate descent on e^T H e (cf. CDQuant, 2024), implemented in `refine_cd.py`; on held-out
+activations it lowers a layer's objective by 12-15% over GPTQ (21-24% on the calibration activations, so part of the
+apparent gain is optimism). The refit solves, per row, the exact least-squares problem for all group offsets and steps
+under the same objective and never increases it. `--refine-z` is a significance filter: a flip is accepted only if its
+gain exceeds z standard errors estimated from disjoint pieces of the calibration text; on real data it reaches the
+same perplexity with a third of the flips.
+
 ## Qwen2.5-1.5B-Instruct: mlx-lm's own quantizers, same evaluation, all packed models
 
 | method | bits/weight | perplexity | size | decode tok/s (same session) |
