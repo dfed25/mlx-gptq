@@ -132,7 +132,9 @@ for li, layer in enumerate(inner.layers):
     for n, c in caps.items(): setm(layer, n, c)
     for b in range(0, args.nsamples, BS): mx.eval(layer(h[b:b + BS], mask, None))   # accumulate H on fp inputs of this layer
     if args.no_sequential:                                         # next layer's inputs from the UNQUANTIZED layer
-        outs = [layer(h[b:b + BS], mask, None) for b in range(0, args.nsamples, BS)]; h_next = mx.concatenate(outs); mx.eval(h_next)
+        outs = []
+        for b in range(0, args.nsamples, BS): o = layer(h[b:b + BS], mask, None); mx.eval(o); outs.append(o)
+        h_next = mx.concatenate(outs); mx.eval(h_next); del outs
     for n, c in caps.items():
         lin = c.lin; W = np.array(lin.weight.astype(mx.float32)); Hn = np.array(c.H) / c.n
         Wq, codes, SC, BI = gptq(W, Hn)
@@ -171,7 +173,9 @@ for li, layer in enumerate(inner.layers):
         CODES[f"model.layers.{li}.{n}"] = (codes.astype(np.uint8), SC, BI)
     if args.no_sequential: h = h_next
     else:
-        outs = [layer(h[b:b + BS], mask, None) for b in range(0, args.nsamples, BS)]; h = mx.concatenate(outs); mx.eval(h)
+        outs = []
+        for b in range(0, args.nsamples, BS): o = layer(h[b:b + BS], mask, None); mx.eval(o); outs.append(o)   # eval per batch: a lazy graph over all batches keeps every intermediate alive (blew memory at 512 samples)
+        h = mx.concatenate(outs); mx.eval(h); del outs
     mx.clear_cache(); print(f"layer {li:2d} done  ({time.time() - t0:.0f}s)" + (f"  refine: {100 * np.mean(FLIPS[-len(NAMES):]):.1f}% of codes changed" if args.refine > 0 else ""), flush=True)
     if args.max_layers and li + 1 >= args.max_layers: print("smoke test finished, nothing saved"); sys.exit(0)
 

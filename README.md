@@ -28,8 +28,8 @@ embedding is why it is 5% larger and 5% slower than the round-to-nearest model; 
 ## 3-bit
 
 The same pipeline at 3 bits with the full recipe (`--mse --lloyd --refine 3 --refit 2`, now the default in `quantize.sh`)
-reaches **10.38** on Qwen2.5-1.5B-Instruct, against 10.90 for the range-search grid alone and 9.38 for fp16: about a
-third of the 3-bit gap closed at the same size. Details and the 2-bit numbers are in RESULTS.md.
+reaches **10.38** on Qwen2.5-1.5B-Instruct (range-search grid alone 10.90; fp16 9.38) and **10.20** on SmolLM2-1.7B-Instruct
+(11.49; fp16 8.94): a third to a half of the 3-bit gap closed at the same size. Details and the 2-bit numbers are in RESULTS.md.
 
 ## Ready-made models
 

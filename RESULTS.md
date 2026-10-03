@@ -42,6 +42,9 @@ the three-seed spread of this pipeline is 0.02. Shipped numbers in earlier rows 
 | `--mse --lloyd` | 21.94 |
 | `--mse --lloyd --refine 3` | 19.63 |
 
+Second model, SmolLM2-1.7B-Instruct, 3-bit, same settings: `--mse` 11.493 → full recipe **10.198** (fp16 8.939): half of
+the 3-bit gap closed.
+
 At 4 bits the refinement adds nothing (`--mse --lloyd` 9.594, with `--refine 3` 9.605). Reference: fp16 9.379.
 
 The refinement is coordinate descent on e^T H e (cf. CDQuant, 2024), implemented in `refine_cd.py`; on held-out
