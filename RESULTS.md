@@ -42,6 +42,10 @@ the three-seed spread of this pipeline is 0.02. Shipped numbers in earlier rows 
 | `--mse --lloyd` | 21.94 |
 | `--mse --lloyd --refine 3` | 19.63 |
 
+Comparators and extensions at 3 bits (Qwen): `mlx_lm.awq` 3-bit with an 8-bit embedding 12.434; `mlx_lm.dwq` 3-bit fine-tuned
+from the round-to-nearest start with 256 x 512 tokens of WikiText-2 train (a reduced budget) 13.545; the same DWQ run
+started from our 3-bit model **10.184**; our recipe with 512 instead of 128 calibration sequences 10.352 (no real gain).
+
 Second model, SmolLM2-1.7B-Instruct, 3-bit, same settings: `--mse` 11.493 → full recipe **10.198** (fp16 8.939): half of
 the 3-bit gap closed.
 

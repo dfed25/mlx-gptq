@@ -33,6 +33,9 @@ reaches **10.38** on Qwen2.5-1.5B-Instruct (range-search grid alone 10.90; fp16 
 
 ## Ready-made models
 
+- [dfed24/Qwen2.5-1.5B-Instruct-gptq-3bit-mlx](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-3bit-mlx) (3-bit, perplexity 10.38, 794 MB)
+- [dfed24/Qwen2.5-1.5B-Instruct-gptq-3bit-dwq-mlx](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-3bit-dwq-mlx) (3-bit + a short DWQ fine-tune, 10.18)
+- [dfed24/SmolLM2-1.7B-Instruct-gptq-3bit-mlx](https://huggingface.co/dfed24/SmolLM2-1.7B-Instruct-gptq-3bit-mlx) (3-bit, 10.20, 778 MB)
 - [dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-mlx](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-mlx) (perplexity 9.66, 951 MB)
 - [dfed24/SmolLM2-1.7B-Instruct-gptq-4bit-mlx](https://huggingface.co/dfed24/SmolLM2-1.7B-Instruct-gptq-4bit-mlx) (perplexity 9.41, 970 MB)
 
