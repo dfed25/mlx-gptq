@@ -107,7 +107,7 @@ class Capture:
     def __call__(self, x):
         X = x.reshape(-1, x.shape[-1]).astype(mx.float32)
         HH = X.T @ X; mx.eval(HH); p = self.calls % args.pieces; self.calls += 1
-        self.Hp[p] = HH if self.Hp[p] is None else self.Hp[p] + HH; self.n += X.shape[0]
+        self.Hp[p] = HH if self.Hp[p] is None else self.Hp[p] + HH; mx.eval(self.Hp[p]); self.n += X.shape[0]   # eval: otherwise the lazy sum keeps every batch's HH alive (64 x 321 MB for down_proj at 512 samples)
         return self.lin(x)
     @property
     def H(self):
