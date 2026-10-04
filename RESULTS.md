@@ -40,10 +40,21 @@ WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596
 | Qwen official GPTQ-Int4 | 10.398 | 27.4% |
 | ours, 4-bit forced to an integer zero point (AWQ format) | 10.44–10.50 | 22.6–28.0% |
 
-1. **The refit helps at 4 bits** (9.537 vs 9.596); our earlier statement that nothing beyond the grid fit helps at 4 bits
-   was based on runs without the refit. A three-seed re-measurement is in progress; the 4-bit model will be republished.
+1. **The refit at 4 bits**: his run of the full recipe gave 9.537 vs 9.596. Our own re-measurement (three runs: 9.575, 9.583
+   in memory, 9.586 packed) finds a smaller perplexity gain, at the pipeline's noise floor, but a clear code gain: HumanEval
+   39.0% vs 32.3% (about 2 standard errors). The 0.05 gap between his 9.537 and our 9.58 is unexplained. The published
+   4-bit model is now the full-recipe one.
 2. **3-bit collapses on code**: about a third of the fp16 pass rate, while perplexity hides it. The 3-bit models are text
-   models; this is now stated on their cards. HumanEval is being added to this pipeline's own evaluation.
+   models; this is now stated on their cards. HumanEval now runs in this pipeline (`mlx_lm.evaluate`, lm-eval 0.4.13) and
+   reproduces his numbers: fp16 38.4%, published 4-bit 32.3%, 3-bit 14.0%, 3-bit + DWQ 14.0%. Two 3-bit experiments:
+
+   | 3-bit variant | WikiText-2 | HumanEval |
+   |---|---|---|
+   | recipe, WikiText calibration (shipped) | 10.38 | 14.0% |
+   | recipe, calibration on half WikiText + half Python source | 10.73 | **23.2%** |
+   | recipe, layers 0-1 and 26-27 at 4 bits (+0.14 bits/weight) | 10.25 | 17.7% |
+
+   The calibration text decides a large part of the code ability; a mixed set trades 0.35 perplexity for 9 points of code.
 3. **The grid's fp16 offset does not survive integer zero-point formats** (GPTQ/AWQ/Marlin kernels): rounding the offset
    costs 0.9 perplexity and 10 points of HumanEval. The advantage currently lives in MLX's affine format. Planned fix:
    a refit constrained to integer zero points (closed-form step per candidate zero point, 16 per group).
