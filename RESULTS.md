@@ -22,6 +22,32 @@ Decode speed (alternating A/B, medians of 5): community 4-bit 138.5 tok/s, GPTQ 
 137.8, GPTQ 3-bit + 8-bit embedding 125.8. The packed 4-bit model with the error-minimising grid and an 8-bit
 embedding has not been measured yet on Qwen.
 
+## Independent evaluation on NVIDIA (M. Federico, 2026-10-04; A10G, vLLM 0.29, float16)
+
+Our MLX checkpoints were unpacked (converter verified bit-exact against `mx.quantize`) and scored with the same
+WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596 (9.596), 3-bit 10.380 (10.38),
+3-bit + DWQ 10.184 (10.18). Three findings beyond our own measurements:
+
+| model | WikiText-2 | HumanEval pass@1 (164, greedy) |
+|---|---|---|
+| fp16 | 9.372 | 37.2% |
+| Qwen official GPTQ-Int8 | 9.381 | 37.2% |
+| ours, full recipe at 4 bits (`--mse --lloyd --refine 3 --refit 2`), exact | **9.537** | 34.8% |
+| ours, published 4-bit (grid fit only), exact | 9.596 | 32.3% |
+| Qwen official AWQ 4-bit | 10.161 | 34.1% |
+| ours, 3-bit + DWQ, exact | 10.184 | 13.4% |
+| ours, published 3-bit, exact | 10.380 | 14.0% |
+| Qwen official GPTQ-Int4 | 10.398 | 27.4% |
+| ours, 4-bit forced to an integer zero point (AWQ format) | 10.44–10.50 | 22.6–28.0% |
+
+1. **The refit helps at 4 bits** (9.537 vs 9.596); our earlier statement that nothing beyond the grid fit helps at 4 bits
+   was based on runs without the refit. A three-seed re-measurement is in progress; the 4-bit model will be republished.
+2. **3-bit collapses on code**: about a third of the fp16 pass rate, while perplexity hides it. The 3-bit models are text
+   models; this is now stated on their cards. HumanEval is being added to this pipeline's own evaluation.
+3. **The grid's fp16 offset does not survive integer zero-point formats** (GPTQ/AWQ/Marlin kernels): rounding the offset
+   costs 0.9 perplexity and 10 points of HumanEval. The advantage currently lives in MLX's affine format. Planned fix:
+   a refit constrained to integer zero points (closed-form step per candidate zero point, 16 per group).
+
 ## Qwen2.5-1.5B-Instruct at 3 and 2 bits: the grid fit, refinement and weighted refit (2026-10-02)
 
 All runs: group 64, same calibration (128 x 512 tokens of WikiText-2 train), evaluated in process with `--eval`;
