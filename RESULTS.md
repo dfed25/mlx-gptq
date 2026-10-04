@@ -56,8 +56,12 @@ WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596
 
    The calibration text decides a large part of the code ability; a mixed set trades 0.35 perplexity for 9 points of code.
 3. **The grid's fp16 offset does not survive integer zero-point formats** (GPTQ/AWQ/Marlin kernels): rounding the offset
-   costs 0.9 perplexity and 10 points of HumanEval. The advantage currently lives in MLX's affine format. Planned fix:
-   a refit constrained to integer zero points (closed-form step per candidate zero point, 16 per group).
+   costs 0.9 perplexity and 10 points of HumanEval. The advantage currently lives in MLX's affine format. The fix, `--zero-point int`,
+   builds the integer-zero-point constraint into the initial grid, the grid fit and the refit (closed-form step for each
+   of the 16 candidate zero points per group, coordinate descent over groups). Full model, evaluated in MLX with the
+   constraint: **4-bit 9.662** (free offset 9.586; Qwen's AWQ 10.16, GPTQ-Int4 10.40; converting the free model
+   afterwards 10.44–10.50) and **3-bit 10.704** (free 10.38). Export to the GPTQ/AWQ safetensors layout and a vLLM check
+   are the next step.
 
 ## Qwen2.5-1.5B-Instruct at 3 and 2 bits: the grid fit, refinement and weighted refit (2026-10-02)
 

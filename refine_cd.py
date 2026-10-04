@@ -164,3 +164,38 @@ def refine_best_first(W, K, LO, SC, Hs, T, z=None, sweeps=3, block=64):
         flips += changed
         if changed == 0: break
     return K, (LO + SC * T[K]).astype(np.float32), flips
+
+
+def refit_grid_zp(W, K, LO, SC, H, group=64, sweeps=2, QMAX=None):
+    """Weighted refit CONSTRAINED to integer zero points (GPTQ/AWQ/int4-kernel format): each group's offset is
+    -z*step with z in {0..QMAX}, so q_j = step_g * (K_j - z_g). With the codes fixed, for a given z_g the layer cost is a
+    quadratic in step_g alone (other groups held fixed), minimised in closed form; the 16 candidate z_g are tried and
+    the cheapest kept. Groups are visited in turn (coordinate descent over groups), a few sweeps. Never increases the
+    cost relative to the starting (LO, SC) IF the start is itself of integer-zero-point form; otherwise the first sweep
+    moves to the nearest-cost integer-zero-point grid. Returns per-entry (LO, SC) and per-group (BI, SCg, Z)."""
+    rows, n = W.shape; M = n // group; H = np.asarray(H, dtype=np.float64); K = K.astype(np.int64)
+    if QMAX is None: QMAX = int(K.max())
+    SCg = SC.reshape(rows, M, group)[:, :, 0].astype(np.float64).copy()
+    Zg = np.clip(np.rint(-LO.reshape(rows, M, group)[:, :, 0] / np.maximum(SCg, 1e-12)), 0, QMAX).astype(np.int64)  # nearest integer zero point as start
+    Kg = K.reshape(rows, M, group)
+    Q = (SCg[:, :, None] * (Kg - Zg[:, :, None])).reshape(rows, n); E = Q - W; G = E @ H
+    for _ in range(sweeps):
+        for g in range(M):
+            sl = slice(g * group, (g + 1) * group); Hgg = H[sl, sl]; Kgg = Kg[:, g, :]
+            q_old = Q[:, sl].copy(); E_rest_G = G[:, sl] - q_old @ Hgg            # (H e_rest)_g = G_g - H_gg q_g
+            # t = k - z: t'H t = kHk - 2 z kH1 + z^2 1H1 and t'(He) = kHe - z 1He are quadratics/linear in z, so all
+            # candidates come from four row-vectors computed once (no per-candidate matrix products)
+            Kf = Kgg.astype(np.float64); KH = Kf @ Hgg; kHk = (KH * Kf).sum(1); one = np.ones(group); H1 = Hgg @ one
+            kH1 = Kf @ H1; oneH1 = float(one @ H1); kHe = (Kf * E_rest_G).sum(1); oneHe = E_rest_G.sum(1)
+            best_cost = None
+            for z in range(QMAX + 1):
+                tHt = kHk - 2 * z * kH1 + z * z * oneH1; tHe = kHe - z * oneHe
+                a = np.where(tHt > 1e-30, -tHe / np.where(tHt > 1e-30, tHt, 1.0), 0.0); a = np.maximum(a, 1e-9)
+                cost = a * a * tHt + 2 * a * tHe
+                if best_cost is None: best_cost, best_a, best_z = cost, a, np.full(rows, z)
+                else:
+                    b = cost < best_cost; best_cost = np.where(b, cost, best_cost); best_a = np.where(b, a, best_a); best_z = np.where(b, z, best_z)
+            q_new = best_a[:, None] * (Kgg - best_z[:, None]); Q[:, sl] = q_new; G += (q_new - q_old) @ H[sl, :]
+            SCg[:, g] = best_a; Zg[:, g] = best_z
+    LOg = -Zg * SCg
+    return np.repeat(LOg, group, 1), np.repeat(SCg, group, 1), LOg.astype(np.float32), SCg.astype(np.float32), Zg

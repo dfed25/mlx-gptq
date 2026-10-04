@@ -30,6 +30,9 @@ ap.add_argument("--refine-damp", type=float, default=0.01, help="ridge added to 
 ap.add_argument("--max-layers", type=int, default=0, help="smoke test: process only this many layers and exit without saving")
 ap.add_argument("--eval", action="store_true", help="after quantization, print WikiText-2 perplexity of the in-memory model (no reload)")
 ap.add_argument("--no-save", action="store_true", help="do not write the model (experiments: avoids a 3 GB write)")
+ap.add_argument("--calib", default="wikitext2_train.txt", help="calibration text file")
+ap.add_argument("--layer-bits", default="", help="per-layer bit overrides, e.g. '0-1:4,26-27:4' (mixed precision; evaluation via the dequantized model)")
+ap.add_argument("--zero-point", default="free", choices=["free", "int"], help="int: every group's offset is -z*step with integer z (GPTQ/AWQ/int4-kernel format), imposed in the initial grid, the grid loop and the refit")
 ap.add_argument("--mse", action="store_true", help="per-group grid by error search (shrink the min-max range) instead of plain min-max")
 args = ap.parse_args()
 QMAX = 2 ** args.bits - 1
@@ -82,10 +85,13 @@ def gptq(W, H):
                             ok = sxx > 0
                             a = np.where(ok, ((k - kb) * (grp - xb)).sum(axis=1) / np.where(ok, sxx, 1.0), st); a = np.maximum(a, 1e-8)
                             b = xb[:, 0] - a * kb[:, 0]
+                            if args.zero_point == "int": b = -np.clip(np.rint(-b / a), 0, QMAX) * a
                             if np.allclose(a, st) and np.allclose(b, l): break
                             st, l = a, b
                         h = l + QMAX * st; e_new = ((quant_group(grp, l, h) - grp) ** 2).sum(axis=1)
                         better = e_new < e_cur; e_cur = np.where(better, e_new, e_cur); lo = np.where(better, l, lo); hi = np.where(better, h, hi)
+                if args.zero_point == "int":                         # offset = -z*step, z integer: zero exactly representable
+                    st_ = np.maximum((hi - lo) / QMAX, 1e-8); z_ = np.clip(np.rint(-lo / st_), 0, QMAX); lo = -z_ * st_; hi = lo + QMAX * st_
                 SC[:, j // g] = np.maximum((hi - lo) / QMAX, 1e-8); BI[:, j // g] = lo
             w = Wb[:, i]; d = Ub[i, i]
             q = quant_group(w[:, None], lo, hi)[:, 0]; Q[:, j] = q; codes[:, j] = np.clip(np.round((q - lo) / np.maximum((hi - lo) / QMAX, 1e-8)), 0, QMAX) if TPL is None else nearest_tick(w[:, None], lo, np.maximum((hi - lo) / QMAX, 1e-8))[:, 0]
@@ -96,7 +102,7 @@ def gptq(W, H):
 
 t0 = time.time(); mx.random.seed(args.seed); np.random.seed(args.seed)
 model, tok = load(args.model)
-ids = tok.encode(open("wikitext2_train.txt").read()); rng = np.random.default_rng(args.seed)
+ids = tok.encode(open(args.calib).read()); rng = np.random.default_rng(args.seed)
 starts = rng.integers(0, len(ids) - args.seqlen, size=args.nsamples)
 calib = mx.array(np.stack([ids[s:s + args.seqlen] for s in starts]))          # (nsamples, seqlen)
 inner = model.model; h = inner.embed_tokens(calib); mask = create_attention_mask(h, None); mx.eval(h)
@@ -127,7 +133,12 @@ def setm(layer, name, val):
     setattr(obj, parts[-1], val)
 
 BS = 8; CODES = {}; FLIPS = []
+LAYER_BITS = {}
+for spec in [x for x in args.layer_bits.split(",") if x]:
+    rng_, bts = spec.split(":"); lo_, hi_ = (rng_.split("-") + [rng_])[:2]
+    for li_ in range(int(lo_), int(hi_) + 1): LAYER_BITS[li_] = int(bts)
 for li, layer in enumerate(inner.layers):
+    QMAX = 2 ** LAYER_BITS.get(li, args.bits) - 1                     # per-layer precision (mixed precision)
     caps = {n: Capture(get(layer, n)) for n in NAMES}
     for n, c in caps.items(): setm(layer, n, c)
     for b in range(0, args.nsamples, BS): mx.eval(layer(h[b:b + BS], mask, None))   # accumulate H on fp inputs of this layer
@@ -153,7 +164,11 @@ for li, layer in enumerate(inner.layers):
                 LOf = np.repeat(BI, args.group, axis=1).astype(np.float64); SCf = np.repeat(SC, args.group, axis=1).astype(np.float64); nfl = 0
                 codes, Wq, f = refine_best_first(Wr, codes, LOf, SCf, Hs, T, z=args.refine_z, sweeps=args.refine); nfl += f
                 for _r in range(args.refit):
-                    LOf, SCf, BI, SC = refit_grid(Wr, codes, LOf, SCf, Hr, T, args.group)
+                    if args.zero_point == "int":
+                        from refine_cd import refit_grid_zp
+                        LOf, SCf, BI, SC, _z = refit_grid_zp(Wr, codes, LOf, SCf, Hr, args.group, sweeps=2, QMAX=QMAX)
+                    else:
+                        LOf, SCf, BI, SC = refit_grid(Wr, codes, LOf, SCf, Hr, T, args.group)
                     codes, Wq, f = refine_best_first(Wr, codes, LOf, SCf, Hs, T, z=args.refine_z, sweeps=args.refine); nfl += f
                 BI = LOf.reshape(len(Wr), -1, args.group)[:, :, 0].astype(np.float32); SC = SCf.reshape(len(Wr), -1, args.group)[:, :, 0].astype(np.float32); del Hs
             elif args.refine_z is not None:
@@ -163,6 +178,13 @@ for li, layer in enumerate(inner.layers):
                 for hp in [h for h in c.Hp if h is not None]:     # float32 pieces, built without float64 temporaries
                     a = np.array(hp).astype(np.float32); a /= np.float32(npc * md); a[np.diag_indices(len(a))] += np.float32(args.refine_damp); Hs.append(a)
                 codes, Wq, nfl = refine_z(Wr, codes, np.repeat(BI, args.group, axis=1), np.repeat(SC, args.group, axis=1), Hs, T, z=args.refine_z, sweeps=args.refine); del Hs
+            elif args.refit > 0 and args.zero_point == "int":
+                from refine_cd import refine, refit_grid_zp
+                LOf = np.repeat(BI, args.group, axis=1).astype(np.float64); SCf = np.repeat(SC, args.group, axis=1).astype(np.float64); nfl = 0
+                codes, Wq, f = refine(Wr, codes, LOf, SCf, Hr, T, sweeps=args.refine); nfl += f
+                for _r in range(args.refit):
+                    LOf, SCf, BI, SC, _z = refit_grid_zp(Wr, codes, LOf, SCf, Hr, args.group, sweeps=2, QMAX=QMAX)
+                    codes, Wq, f = refine(Wr, codes, LOf, SCf, Hr, T, sweeps=args.refine); nfl += f
             elif args.refit > 0:
                 from refine_cd import refine_with_refit
                 codes, Wq, SC, BI, nfl = refine_with_refit(Wr, codes, np.repeat(BI, args.group, axis=1).astype(np.float64), np.repeat(SC, args.group, axis=1).astype(np.float64), Hr, T, rounds=args.refit, sweeps=args.refine, group=args.group)
