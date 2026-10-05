@@ -62,7 +62,10 @@ WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596
    constraint: **4-bit 9.662** (free offset 9.586; Qwen's AWQ 10.16, GPTQ-Int4 10.40; converting the free model
    afterwards 10.44–10.50) and **3-bit 10.704** (free 10.38). Packed, the 4-bit model scores 9.663 and 33.5% on HumanEval in MLX; converted to the
    AWQ layout with M. Federico's `mlx2hf.py --awq` the weights change by 0.05% (free-offset models: about 10%). The export
-   is at huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq; its vLLM check is pending.
+   is at huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq. **Verified on an NVIDIA A10G through vLLM's int4
+   Marlin kernel (2026-10-05): perplexity 9.6625 and HumanEval 33.5%, identical to the MLX numbers**, against 10.161 / 34.1%
+   for Qwen's official AWQ 4-bit and 10.398 / 27.4% for its GPTQ-Int4 on the same box and protocol. An offline rotation
+   (QuaRot-style) was tested independently on the PyTorch port of this pipeline and made no difference to the method.
 
 ## Where the code ability is lost (2026-10-05)
 
