@@ -60,8 +60,22 @@ WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596
    builds the integer-zero-point constraint into the initial grid, the grid fit and the refit (closed-form step for each
    of the 16 candidate zero points per group, coordinate descent over groups). Full model, evaluated in MLX with the
    constraint: **4-bit 9.662** (free offset 9.586; Qwen's AWQ 10.16, GPTQ-Int4 10.40; converting the free model
-   afterwards 10.44–10.50) and **3-bit 10.704** (free 10.38). Export to the GPTQ/AWQ safetensors layout and a vLLM check
-   are the next step.
+   afterwards 10.44–10.50) and **3-bit 10.704** (free 10.38). Packed, the 4-bit model scores 9.663 and 33.5% on HumanEval in MLX; converted to the
+   AWQ layout with M. Federico's `mlx2hf.py --awq` the weights change by 0.05% (free-offset models: about 10%). The export
+   is at huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq; its vLLM check is pending.
+
+## Where the code ability is lost (2026-10-05)
+
+`agree.py` runs a model teacher-forced over the 164 HumanEval reference solutions (8,872 positions) and counts how often
+its top choice differs from the fp16 model's: 4.4% for the 4-bit full recipe, 4.9% for the 4-bit integer-zero-point
+model, 11.3% for the 3-bit model. This tracks HumanEval (39%, 33.5%, 14%) and needs no code execution. A layer scan at
+3 bits shows the damage is diffuse: restoring any single layer to fp16 removes at most 0.6 of the 11.3 points, and
+quantizing any single layer alone creates 1 to 2.7 points. `humaneval_diag.py` sorts the 3-bit failures: of the 59
+problems fp16 solves, 39 are lost, mostly to repetitive loops and placeholder stubs rather than syntax errors.
+
+**On noise.** The 0.02 quoted in this file is the spread over calibration seeds on one machine. The same recipe and seed
+gave 9.537 and 9.554 on two other machines and 9.575 to 9.586 here, so differences of about 0.05 between machines are
+not meaningful.
 
 ## Qwen2.5-1.5B-Instruct at 3 and 2 bits: the grid fit, refinement and weighted refit (2026-10-02)
 
