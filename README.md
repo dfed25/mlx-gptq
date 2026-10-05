@@ -25,6 +25,23 @@ The SmolLM2 row is the packed model exactly as `quantize.sh` produces it (8-bit 
 embedding is why it is 5% larger and 5% slower than the round-to-nearest model; with a 4-bit embedding
 (`EMBED_BITS=4`) size and speed match the community model and the perplexity rises by about 0.5.
 
+## On NVIDIA: the same recipe in AWQ format, on vLLM's int4 kernel
+
+With `--zero-point int` every group's offset is a whole number of steps, so the model converts to the AutoAWQ layout
+without loss and runs on vLLM's `awq_marlin` kernel. Measured on an A10G with vLLM 0.29, every model served through
+the kernel (WikiText-2 perplexity / HumanEval pass@1; independent evaluation and PyTorch port by M. Federico):
+
+| model | fp16 | **this recipe, 4-bit** | official Qwen AWQ 4-bit |
+|---|---|---|---|
+| Qwen2.5-1.5B-Instruct | 9.37 / 37.2% | **9.66** / 33.5% | 10.16 / 34.1% |
+| Qwen2.5-7B-Instruct | 7.15 / 70.1% | **7.29** / 67.1% | 7.58 / 64.6% |
+
+One run per row; the HumanEval differences among the 4-bit models are inside the standard error (about 3.6 points);
+calibration is WikiText-2 train, in-domain for the perplexity test (worth about 0.3 on the 1.5B model); the lead
+shrinks with model size. Models:
+[7B](https://huggingface.co/dfed24/Qwen2.5-7B-Instruct-gptq-4bit-int4-awq),
+[1.5B](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq). Details in RESULTS.md.
+
 ## 3-bit
 
 The same pipeline at 3 bits with the full recipe (`--mse --lloyd --refine 3 --refit 2`, now the default in `quantize.sh`)
