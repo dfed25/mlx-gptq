@@ -65,7 +65,23 @@ WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596
    is at huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq. **Verified on an NVIDIA A10G through vLLM's int4
    Marlin kernel (2026-10-05): perplexity 9.6625 and HumanEval 33.5%, identical to the MLX numbers**, against 10.161 / 34.1%
    for Qwen's official AWQ 4-bit and 10.398 / 27.4% for its GPTQ-Int4 on the same box and protocol. An offline rotation
-   (QuaRot-style) was tested independently on the PyTorch port of this pipeline and made no difference to the method.
+   (QuaRot-style) was tested independently on the PyTorch port of this pipeline: no difference at 4 bits (all cells
+   within a few hundredths); at 3 bits it helps the integer-zero-point version (10.70 -> 10.47) and barely changes the
+   free-offset one (10.39 -> 10.35).
+
+### Larger models (2026-10-05; M. Federico's PyTorch port of this pipeline, A10G, vLLM 0.29, one run per row)
+
+| model | fp16 | ours, 4-bit | Qwen official AWQ 4-bit |
+|---|---|---|---|
+| Qwen2.5-7B-Instruct, integer zero points, on the int4 kernel | 7.145 / 70.1% | **7.288** / 67.1% | 7.583 / 64.6% |
+| Qwen2.5-32B-Instruct, free offsets (streamed, not servable on the int4 kernel) | 4.761 | **4.892** | 5.043 / 65.9% |
+| Qwen2.5-32B-Instruct, free offsets rounded afterwards, on the int4 kernel | | 5.079 / 64.6% | 5.043 / 65.9% |
+
+Cells are WikiText-2 perplexity / HumanEval pass@1. The 7B model is at
+huggingface.co/dfed24/Qwen2.5-7B-Instruct-gptq-4bit-int4-awq. The lead over Qwen's AWQ shrinks with size (0.50 at 1.5B,
+0.30 at 7B on the kernel; 0.15 at 32B for the free-offset model), the HumanEval differences among 4-bit models are
+inside the standard error (about 3.6 points), the calibration is in-domain for the perplexity test, and the 32B model
+has not been made with integer zero points.
 
 ## Where the code ability is lost (2026-10-05)
 
