@@ -35,12 +35,13 @@ the kernel (WikiText-2 perplexity / HumanEval pass@1; independent evaluation and
 |---|---|---|---|
 | Qwen2.5-1.5B-Instruct | 9.37 / 37.2% | **9.66** / 33.5% | 10.16 / 34.1% |
 | Qwen2.5-7B-Instruct | 7.15 / 70.1% | **7.29** / 67.1% | 7.58 / 64.6% |
+| Qwen3-8B (generic calibration text) | 9.60 / 70.7% | **9.80** / 71.3% | 10.07 / 70.7% |
 
 One run per row; the HumanEval differences among the 4-bit models are inside the standard error (about 3.6 points);
 calibration is WikiText-2 train, in-domain for the perplexity test (worth about 0.3 on the 1.5B model); the lead
 shrinks with model size. Models:
 [7B](https://huggingface.co/dfed24/Qwen2.5-7B-Instruct-gptq-4bit-int4-awq),
-[1.5B](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq). Details in RESULTS.md.
+[1.5B](https://huggingface.co/dfed24/Qwen2.5-1.5B-Instruct-gptq-4bit-int4-awq), [Qwen3-8B](https://huggingface.co/dfed24/Qwen3-8B-gptq-4bit-int4-awq). Details in RESULTS.md.
 
 ## 3-bit
 

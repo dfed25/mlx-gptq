@@ -76,8 +76,9 @@ WikiText-2 protocol through vLLM: fp16 9.372 (ours 9.379), published 4-bit 9.596
 | Qwen2.5-7B-Instruct, integer zero points, on the int4 kernel | 7.145 / 70.1% | **7.288** / 67.1% | 7.583 / 64.6% |
 | Qwen2.5-32B-Instruct, free offsets (streamed, not servable on the int4 kernel) | 4.761 | **4.892** | 5.043 / 65.9% |
 | Qwen2.5-32B-Instruct, free offsets rounded afterwards, on the int4 kernel | | 5.079 / 64.6% | 5.043 / 65.9% |
+| Qwen3-8B, integer zero points, generic calibration text, on the int4 kernel | 9.595 / 70.7% | **9.799** / 71.3% | 10.069 / 70.7% |
 
-Cells are WikiText-2 perplexity / HumanEval pass@1. The 7B model is at
+Cells are WikiText-2 perplexity / HumanEval pass@1. The Qwen3-8B row is calibrated on generic text (mlx-lm's calibration_v5), so it is not in-domain for the perplexity test; with WikiText calibration the same recipe gives 9.753 / 68.9%. Qwen3-8B model: huggingface.co/dfed24/Qwen3-8B-gptq-4bit-int4-awq. The 7B model is at
 huggingface.co/dfed24/Qwen2.5-7B-Instruct-gptq-4bit-int4-awq. The lead over Qwen's AWQ shrinks with size (0.50 at 1.5B,
 0.30 at 7B on the kernel; 0.15 at 32B for the free-offset model), the HumanEval differences among 4-bit models are
 inside the standard error (about 3.6 points), the calibration is in-domain for the perplexity test, and the 32B model
